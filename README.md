@@ -36,6 +36,9 @@ Urgency words in notes (e.g. "urgent", "this week", "ready")	+20
 
 The total is capped at 100.
 
+<img width="1551" height="595" alt="image" src="https://github.com/user-attachments/assets/0eca5f90-7114-49b4-8341-6ef7273b161d" />
+
+
 2. Site Visit Booking
 
 Webhook: GET/POST /webhook/book-visit?lead_id=...
@@ -46,6 +49,10 @@ The chosen date, time and project are validated (the time cannot be in the past)
 A one-hour Google Calendar event is created in IST, with the lead and the agent as attendees.
 The booking is saved to the Bookings sheet, and confirmation emails go to both the lead and the agent.
 The lead sees a confirmation page. Invalid links and failures show friendly error pages.
+
+<img width="1502" height="380" alt="image" src="https://github.com/user-attachments/assets/0985f971-0b59-4f27-b62a-58624603a361" />
+
+
 3. Missed Alert Detector
 
 Runs every 5 minutes.
@@ -85,6 +92,9 @@ Activate all three workflows. For local testing, expose n8n with a tunnel such a
 Tech stack
 
 n8n, JavaScript (Code nodes), Google Sheets, Gmail, Google Calendar, HTML/CSS/JS.
+
+<img width="1251" height="362" alt="image" src="https://github.com/user-attachments/assets/1a04bb9c-60f2-44eb-9dfe-2b068e8c5ddd" />
+
 
 Author
 
