@@ -1,0 +1,273 @@
+{
+  "name": "3. Missed Alert Detector (Sweep) (Fixed)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "697ec25d-da0c-4b1d-a586-21a2c77251e6",
+      "name": "Every 5 Minutes"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Vj4tyBEa8VD4nmK172GtMCJLrWXLbpb2nnJ6cCAQH30",
+          "mode": "list",
+          "cachedResultName": "Real Estate Automation DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Vj4tyBEa8VD4nmK172GtMCJLrWXLbpb2nnJ6cCAQH30/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2080027938,
+          "mode": "list",
+          "cachedResultName": "Scored Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Vj4tyBEa8VD4nmK172GtMCJLrWXLbpb2nnJ6cCAQH30/edit#gid=2080027938"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d8e17a84-f40e-45fa-b90a-afcd0a8a2c32",
+      "name": "Get All Scored Leads",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "o53PhkMad13nE9rK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only Hot leads whose alert is still Pending 15+ minutes after it fired,\n// and attach the fallback reason (Off-hours vs No-ack) to each one.\nconst FIFTEEN_MIN_MS = 15 * 60 * 1000;\nconst results = [];\n\nfor (const item of $input.all()) {\n  const row = item.json;\n  if (row['Status'] !== 'Hot') continue;\n  if (row['Response_Status'] !== 'Pending') continue;\n  if (!row['Timestamp']) continue;\n\n  const alertTime = new Date(row['Timestamp']);\n  const ageMs = Date.now() - alertTime.getTime();\n  if (isNaN(ageMs)) continue;           // unreadable timestamp - skip it instead of marking the lead as missed\n  if (ageMs < FIFTEEN_MIN_MS) continue; // not overdue yet — check again next sweep\n\n  // IST business hours check: Mon–Sat, 9:00–19:00\n  const istMs = alertTime.getTime() + (5.5 * 60 * 60 * 1000);\n  const ist = new Date(istMs);\n  const hour = ist.getUTCHours();\n  const day = ist.getUTCDay(); // 0 = Sunday\n  const isOffHours = day === 0 || hour < 9 || hour >= 19;\n\n  results.push({\n    json: {\n      ...row,\n      'Fallback_Reason': isOffHours ? 'Off-hours' : 'No-ack'\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "edf16b4d-c6a8-4c04-9506-84b9b701bc88",
+      "name": "Find Overdue Hot Leads"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1Vj4tyBEa8VD4nmK172GtMCJLrWXLbpb2nnJ6cCAQH30",
+          "mode": "list",
+          "cachedResultName": "Real Estate Automation DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Vj4tyBEa8VD4nmK172GtMCJLrWXLbpb2nnJ6cCAQH30/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2080027938,
+          "mode": "list",
+          "cachedResultName": "Scored Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Vj4tyBEa8VD4nmK172GtMCJLrWXLbpb2nnJ6cCAQH30/edit#gid=2080027938"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{ $json['Lead ID'] }}",
+            "Response_Status": "Missed",
+            "Fallback_Reason": "={{ $json['Fallback_Reason'] }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "Lead ID"
+          ],
+          "schema": [
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Response_Status",
+              "displayName": "Response_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Agent Email",
+              "displayName": "Agent Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fallback_Reason",
+              "displayName": "Fallback_Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        0
+      ],
+      "id": "fd1bfcde-282a-4a82-b2c9-5a7e0d557586",
+      "name": "Log Missed Alert",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "o53PhkMad13nE9rK",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get All Scored Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Scored Leads": {
+      "main": [
+        [
+          {
+            "node": "Find Overdue Hot Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Overdue Hot Leads": {
+      "main": [
+        [
+          {
+            "node": "Log Missed Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "570b99b7-019e-4ec1-af49-be9d580dbe98",
+  "meta": {
+    "instanceId": "c399fa87e0bc1b8db1d2bfb481d0fb6999ca9ac05a2caf8fec09a94b5ea6ca1d"
+  },
+  "nodeGroups": [],
+  "id": "51MS4hj8fEzPQ4s7",
+  "tags": []
+}

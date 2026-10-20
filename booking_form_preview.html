@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule Site Visit</title>
+  <style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 50px 20px; background: #f5f5f5; margin: 0; }
+  .box { background: white; padding: 40px; border-radius: 10px; max-width: 500px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+  label { display: block; text-align: left; font-weight: bold; font-size: 14px; margin-top: 12px; }
+  input, select { width: 100%; padding: 10px; margin: 6px 0 10px 0; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+  .btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; }
+  .detail { background: #f1f8f3; border-radius: 6px; padding: 12px; margin: 16px 0; color: #333; }
+  p { color: #555; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>📅 Select Visit Schedule</h2>
+    <p>Choose a date, time and project for your site visit.</p>
+    <form method="POST" action="">
+      <input type="hidden" name="lead_id" value="L1234567890123EXAMPLE">
+      <label for="preferred_date">Preferred Date:</label>
+      <input type="date" id="preferred_date" name="preferred_date" min="2026-10-18" required>
+      <label for="preferred_time">Preferred Time:</label>
+      <input type="time" id="preferred_time" name="preferred_time" required>
+      <label for="property_name">Select Project Name:</label>
+      <select id="property_name" name="property_name">
+        <option value="Royal Regency Kalyan">Royal Regency Kalyan</option>
+        <option value="Elite Heights Thane">Elite Heights Thane</option>
+        <option value="Galaxy Towers Titwala">Galaxy Towers Titwala</option>
+      </select>
+      <button type="submit" class="btn">Confirm Schedule</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get in Touch - Property Enquiry</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 40px 20px; background: #f5f5f5; margin: 0; }
+  .box { background: white; padding: 40px; border-radius: 10px; max-width: 520px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: left; }
+  .box h2 { text-align: center; margin-top: 0; }
+  label { font-weight: bold; font-size: 14px; display: block; margin-top: 14px; }
+  input, select, textarea { width: 100%; padding: 10px; margin: 6px 0 0 0; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; font-family: inherit; }
+  textarea { resize: vertical; min-height: 70px; }
+  .row { display: flex; gap: 10px; }
+  .hint { font-size: 12px; color: #888; margin-top: 4px; }
+  .btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 20px; }
+  .btn:disabled { background: #9bcfad; cursor: not-allowed; }
+
+  /* banner shown above the form: rejected details (orange) or no connection (red) */
+  #banner { max-width: 520px; margin: 0 auto 16px auto; padding: 14px; border-radius: 6px; font-size: 14px; text-align: left; display: none; }
+  #banner.rejected { display: block; background: #fff4e5; color: #8a4b00; border: 1px solid #f5d19e; }
+  #banner.offline  { display: block; background: #fdecea; color: #a3231b; border: 1px solid #f5c2bd; }
+  #banner ul { margin: 8px 0 0 18px; padding: 0; }
+
+  /* full-page states that replace the form */
+  #successView, #failedView { display: none; }
+  .center { text-align: center; }
+  .icon { font-size: 44px; margin-bottom: 8px; }
+  #successView h2 { color: #1e7a34; }
+  #failedView h2 { color: #c0392b; }
+  .box p { color: #555; font-size: 15px; line-height: 1.5; }
+  .small { font-size: 12px; color: #999; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+  <!-- BANNER: shown for "rejected details" and "could not reach the server" -->
+  <div id="banner" role="alert"></div>
+
+  <!-- 1. THE FORM -->
+  <div class="box" id="formView">
+    <h2>🏠 Tell us what you're looking for</h2>
+    <form id="leadForm">
+      <label for="name">Full Name *</label>
+      <input type="text" id="name" name="name" required>
+
+      <label for="email">Email *</label>
+      <input type="email" id="email" name="email" required>
+
+      <label for="phone">Phone Number *</label>
+      <input type="tel" id="phone" name="phone" placeholder="10-digit number" required>
+
+      <label for="location_pref">Preferred Location</label>
+      <input type="text" id="location_pref" name="location_pref" placeholder="e.g. Kalyan, Thane">
+
+      <label for="budget_min">Budget (₹)</label>
+      <div class="row">
+        <input type="number" id="budget_min" name="budget_min" placeholder="Min" min="0">
+        <input type="number" id="budget_max" name="budget_max" placeholder="Max" min="0" aria-label="Maximum budget">
+      </div>
+
+      <label for="property_type">Property Type</label>
+      <select id="property_type" name="property_type">
+        <option value="Any">Any</option>
+        <option value="Apartment">Apartment</option>
+        <option value="Villa">Villa</option>
+        <option value="Plot">Plot</option>
+        <option value="Commercial">Commercial</option>
+      </select>
+
+      <label for="source">How did you hear about us?</label>
+      <select id="source" name="source">
+        <option value="Website">Website</option>
+        <option value="Landing Page">Landing Page</option>
+        <option value="Facebook">Facebook</option>
+        <option value="Instagram">Instagram</option>
+        <option value="Referral">Referral</option>
+        <option value="Google Ads">Google Ads</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <label for="notes">Anything else you'd like us to know?</label>
+      <textarea id="notes" name="notes" placeholder="e.g. Looking to buy this week, need a 2BHK near the station..."></textarea>
+      <div class="hint">Mentioning urgency (e.g. "urgent", "ready to buy", "this week") helps us prioritize your enquiry.</div>
+
+      <button type="submit" class="btn" id="submitBtn">Submit Enquiry</button>
+    </form>
+  </div>
+
+  <!-- 2. SUCCESS: lead saved and scored -->
+  <div id="successView">
+    <div class="box center">
+      <div class="icon">✅</div>
+      <h2>Thank you!</h2>
+      <p>Your enquiry has been received.</p>
+      <p>One of our agents will reach out to you shortly.</p>
+      <div class="small">You can close this page now.</div>
+    </div>
+  </div>
+
+  <!-- 3. FAILED: the server had a problem (not the visitor's fault) -->
+  <div id="failedView">
+    <div class="box center">
+      <div class="icon">⚠️</div>
+      <h2>We couldn't save your enquiry</h2>
+      <p>Something went wrong on our side. Your details were not saved.</p>
+      <p>Please try again in a few minutes.</p>
+      <button type="button" class="btn" id="retryBtn">Try Again</button>
+      <div class="small" id="failedCode"></div>
+    </div>
+  </div>
+
+  <script>
+    // UPDATE THIS if your n8n address changes.
+    // It must match the Webhook path in workflow 1 (lead-ingestion).
+    var WEBHOOK_URL = "https://deranged-user-twitch.ngrok-free.dev/webhook/lead-ingestion";
+
+    var form = document.getElementById('leadForm');
+    var formView = document.getElementById('formView');
+    var successView = document.getElementById('successView');
+    var failedView = document.getElementById('failedView');
+    var failedCode = document.getElementById('failedCode');
+    var banner = document.getElementById('banner');
+    var submitBtn = document.getElementById('submitBtn');
+
+    function show(view) {                 // show only one of the three main screens
+      formView.style.display = view === 'form' ? 'block' : 'none';
+      successView.style.display = view === 'success' ? 'block' : 'none';
+      failedView.style.display = view === 'failed' ? 'block' : 'none';
+    }
+
+    function showBanner(type, title, items) {   // type: 'rejected' or 'offline'
+      banner.className = type;
+      banner.textContent = '';
+      var strong = document.createElement('strong');
+      strong.textContent = title;
+      banner.appendChild(strong);
+      if (items && items.length) {
+        var ul = document.createElement('ul');
+        items.forEach(function (text) {
+          var li = document.createElement('li');
+          li.textContent = text;            // textContent keeps server text from being run as HTML
+          ul.appendChild(li);
+        });
+        banner.appendChild(ul);
+      }
+      window.scrollTo(0, 0);
+    }
+
+    function hideBanner() { banner.className = ''; }
+
+    document.getElementById('retryBtn').addEventListener('click', function () {
+      hideBanner();
+      show('form');                         // the typed details are still in the form
+    });
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideBanner();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      var payload = Object.fromEntries(new FormData(form).entries());
+      var res, data = null;
+
+      try {
+        res = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        // CASE 4: no connection / server switched off
+        showBanner('offline', 'Could not reach the server. Please check your internet connection and try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Enquiry';
+        return;
+      }
+
+      try { data = await res.json(); } catch (err) { data = null; }   // a 404 page or similar is not JSON
+
+      if (res.ok && data && data.status === 'success') {
+        // CASE 1: success
+        show('success');
+      } else if (res.status === 400 && data && data.details) {
+        // CASE 2: details rejected - tell the visitor what to fix, keep the form filled in
+        showBanner('rejected', 'Please check your details:', String(data.details).split('; '));
+      } else {
+        // CASE 3: failed - server error, wrong URL, workflow switched off, unexpected reply
+        failedCode.textContent = 'Error code: ' + res.status;
+        show('failed');
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Enquiry';
+    });
+  </script>
+
+</body>
+</html>
