@@ -1,0 +1,261 @@
+{
+  "name": "3. Missed Alert Detector - Sweep (Template)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "697ec25d-da0c-4b1d-a586-21a2c77251e6",
+      "name": "Every 5 Minutes"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Scored Leads",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d8e17a84-f40e-45fa-b90a-afcd0a8a2c32",
+      "name": "Get All Scored Leads",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only Hot leads whose alert is still Pending 15+ minutes after it fired,\n// and attach the fallback reason (Off-hours vs No-ack) to each one.\nconst FIFTEEN_MIN_MS = 15 * 60 * 1000;\nconst results = [];\n\nfor (const item of $input.all()) {\n  const row = item.json;\n  if (row['Status'] !== 'Hot') continue;\n  if (row['Response_Status'] !== 'Pending') continue;\n  if (!row['Timestamp']) continue;\n\n  const alertTime = new Date(row['Timestamp']);\n  const ageMs = Date.now() - alertTime.getTime();\n  if (isNaN(ageMs)) continue;           // unreadable timestamp - skip it instead of marking the lead as missed\n  if (ageMs < FIFTEEN_MIN_MS) continue; // not overdue yet — check again next sweep\n\n  // IST business hours check: Mon–Sat, 9:00–19:00\n  const istMs = alertTime.getTime() + (5.5 * 60 * 60 * 1000);\n  const ist = new Date(istMs);\n  const hour = ist.getUTCHours();\n  const day = ist.getUTCDay(); // 0 = Sunday\n  const isOffHours = day === 0 || hour < 9 || hour >= 19;\n\n  results.push({\n    json: {\n      ...row,\n      'Fallback_Reason': isOffHours ? 'Off-hours' : 'No-ack'\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "edf16b4d-c6a8-4c04-9506-84b9b701bc88",
+      "name": "Find Overdue Hot Leads"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Scored Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{ $json['Lead ID'] }}",
+            "Response_Status": "Missed",
+            "Fallback_Reason": "={{ $json['Fallback_Reason'] }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "Lead ID"
+          ],
+          "schema": [
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Response_Status",
+              "displayName": "Response_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Agent Email",
+              "displayName": "Agent Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fallback_Reason",
+              "displayName": "Fallback_Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        0
+      ],
+      "id": "fd1bfcde-282a-4a82-b2c9-5a7e0d557586",
+      "name": "Log Missed Alert",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "content": "## Setup (read first)\n1. Paste your sheet ID into **YOUR_GOOGLE_SHEET_ID** and connect Google Sheets.\n2. Agents set `Response_Status` to `Acknowledged` by hand in the Scored Leads tab.\n3. Hot leads still `Pending` after 15 minutes are marked `Missed` (Off-hours or No-ack).\n4. Business hours (Mon-Sat 9:00-19:00 IST) are set in `Find Overdue Hot Leads`.",
+        "height": 260,
+        "width": 480
+      },
+      "id": "278fcf1e-c289-4264-bbea-c18a93d1947f",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -340
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get All Scored Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Scored Leads": {
+      "main": [
+        [
+          {
+            "node": "Find Overdue Hot Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Overdue Hot Leads": {
+      "main": [
+        [
+          {
+            "node": "Log Missed Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}

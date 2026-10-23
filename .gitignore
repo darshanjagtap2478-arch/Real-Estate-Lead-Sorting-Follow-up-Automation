@@ -1,0 +1,17 @@
+# Secrets and exports (never commit)
+.env
+*.env
+credentials*.json
+*credentials*.json
+*.key
+*.pem
+
+# Original (non-template) workflow exports contain real IDs and emails
+*Fixed*.json
+*_fixed.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

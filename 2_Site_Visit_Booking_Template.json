@@ -1,0 +1,624 @@
+{
+  "name": "2. Site Visit Booking (Template)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": [
+          "GET",
+          "POST"
+        ],
+        "path": "book-visit",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        192
+      ],
+      "id": "262c31c5-0d06-4eb9-9af7-5eeed3ff396e",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers['content-type'] }}",
+              "rightValue": "x-www-form-urlencoded",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "id": "c3ac2f24-b736-453d-b767-45ea4fdab3d6"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        96
+      ],
+      "id": "3faf3af5-4c62-4679-bf18-2e7577e4a791",
+      "name": "Is POST Submission?"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Schedule Site Visit</title>\n  <style>\n    body { font-family: 'Segoe UI', sans-serif; background-color: #F7F5F0; color: #1A1816; margin: 0; padding: 50px 20px; display: flex; justify-content: center; }\n    .box { background-color: rgba(255, 255, 255, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 0, 0, 0.08); padding: 40px; border-radius: 6px; max-width: 500px; width: 100%; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); }\n    h2 { font-size: 1.5rem; margin-bottom: 5px; }\n    p { color: #666666; font-size: 0.95rem; margin-bottom: 25px; }\n    label { display: block; font-weight: 600; font-size: 0.85rem; margin-top: 18px; margin-bottom: 6px; }\n    input, select { width: 100%; padding: 10px 14px; margin-bottom: 5px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, 0.08); background-color: rgba(255, 255, 255, 0.8); color: #1A1816; font-size: 0.95rem; box-sizing: border-box; }\n    input:focus, select:focus { outline: none; border-color: #C5A059; }\n    select option { background-color: #F7F5F0; color: #1A1816; }\n    .btn { background-color: #C5A059; color: #FFFFFF; border: 1px solid #C5A059; padding: 12px 26px; border-radius: 4px; font-weight: 600; font-size: 0.95rem; cursor: pointer; width: 100%; margin-top: 20px; }\n    .btn:hover { background-color: #1A1816; border-color: #1A1816; }\n  </style>\n</head>\n<body>\n  <div class=\"box\">\n    <h2>📅 Select Visit Schedule</h2>\n    <p>Choose a date, time and project for your site visit.</p>\n    <form method=\"POST\" action=\"\">\n      <input type=\"hidden\" name=\"lead_id\" value=\"{{ $json.query.lead_id }}\">\n      <label for=\"preferred_date\">Preferred Date:</label>\n      <input type=\"date\" id=\"preferred_date\" name=\"preferred_date\" min=\"{{ new Date(Date.now() + 19800000).toISOString().slice(0, 10) }}\" required>\n      <label for=\"preferred_time\">Preferred Time:</label>\n      <input type=\"time\" id=\"preferred_time\" name=\"preferred_time\" required>\n      <label for=\"property_name\">Select Project Name:</label>\n      <select id=\"property_name\" name=\"property_name\">\n        <option value=\"Project A\">Project A</option>\n        <option value=\"Project B\">Project B</option>\n        <option value=\"Project C\">Project C</option>\n      </select>\n      <button type=\"submit\" class=\"btn\">Confirm Schedule</button>\n    </form>\n  </div>\n</body>\n</html>\n",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "7be36dad-c584-4cb8-889d-1042f9619e74",
+      "name": "Render Booking Form"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Master Leads",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Lead ID",
+              "lookupValue": "={{ $json.body.lead_id || $json.query.lead_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        192
+      ],
+      "id": "b7e04d82-f663-4aeb-8177-59e109b924d7",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Projects people may book - keep this list the same as the dropdown in \"Render Booking Form\"\nconst ALLOWED_PROPERTIES = ['Project A', 'Project B', 'Project C'];\n\nconst rows = $('Get row(s) in sheet').all();\nif (!rows || rows.length === 0 || !rows[0].json['Lead ID']) {\n  throw new Error(\"Lead ID matching the booking token was not found in Master Leads database.\");\n}\nconst sheetData = rows[0].json;\nconst bookingData = $('Is POST Submission?').first().json.body || {};\n\nconst date = String(bookingData.preferred_date || '').trim(); // \"2026-07-11\"\nconst time = String(bookingData.preferred_time || '').trim(); // \"11:11\"\nconst propName = ALLOWED_PROPERTIES.includes(bookingData.property_name) ? bookingData.property_name : '';\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time)) {\n  throw new Error(\"Form submission is missing a valid date or time.\");\n}\nif (!propName) {\n  throw new Error(\"Please select a valid project.\");\n}\n\n// 1. Explicitly force the start time into Indian Standard Time (+05:30)\nconst startTimeStr = date + 'T' + time + ':00+05:30';\nconst parsedStart = new Date(startTimeStr);\nif (isNaN(parsedStart.getTime())) {\n  throw new Error(\"The date or time is not valid.\");\n}\nif (parsedStart.getTime() < Date.now()) {\n  throw new Error(\"The chosen visit time is in the past.\");\n}\n\n// 2. Add exactly 1 hour for the end time\nconst parsedEnd = new Date(parsedStart.getTime() + 60 * 60 * 1000);\n\n// 3. Format the end time string back with the +05:30 offset\nconst offsetInMs = 5.5 * 60 * 60 * 1000;\nconst localEnd = new Date(parsedEnd.getTime() + offsetInMs);\nconst endTimeStr = localEnd.toISOString().slice(0, 19) + '+05:30';\n\nreturn [{\n  json: {\n    lead_id: sheetData['Lead ID'],\n    name: sheetData['Name'],\n    email: sheetData['Email'],\n    agent_email: sheetData['Agent Email'],\n    assigned_agent: sheetData['Assigned Agent'],\n    property_name: propName,\n    event_title: 'Site Visit: ' + propName + ' | ' + sheetData['Name'],\n    start_time: startTimeStr,\n    end_time: endTimeStr,\n    preferred_date: date,\n    preferred_time: time\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        128
+      ],
+      "id": "9434b971-a19d-4461-a38b-a5c25f2dd5ab",
+      "name": "Code in JavaScript1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_ID",
+          "mode": "id"
+        },
+        "start": "={{ $json.start_time }}",
+        "end": "={{ $json.end_time }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $json.email }}",
+            "={{ $json.agent_email }}"
+          ],
+          "location": "={{ $json.property_name }}",
+          "sendUpdates": "all",
+          "summary": "={{ $json.event_title }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        48
+      ],
+      "id": "ae83a969-c4d9-4388-bbd8-906ef6ea1d6a",
+      "name": "Create an event",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Bookings",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Booking ID": "={{ \"BK-\" + Date.now().toString(36).toUpperCase() }}",
+            "Lead ID": "={{ $('Code in JavaScript1').first().json.lead_id }}",
+            "Lead Name": "={{ $('Code in JavaScript1').first().json.name }}",
+            "Lead Email": "={{ $('Code in JavaScript1').first().json.email }}",
+            "Property": "={{ $('Code in JavaScript1').first().json.property_name }}",
+            "Date": "={{ $('Code in JavaScript1').first().json.preferred_date }}",
+            "Time": "={{ $('Code in JavaScript1').first().json.preferred_time }}",
+            "Agent Email": "={{ $('Code in JavaScript1').first().json.agent_email }}",
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Calendar Event ID": "={{ $('Create an event').first().json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Name",
+              "displayName": "Lead Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Email",
+              "displayName": "Lead Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Property",
+              "displayName": "Property",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Agent Email",
+              "displayName": "Agent Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Calendar Event ID",
+              "displayName": "Calendar Event ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "f444626e-d61f-4004-a7a0-7f2e6ab4dd44",
+      "name": "Append row in sheet",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript1').first().json.email }}",
+        "subject": "Your site visit is confirmed!",
+        "emailType": "text",
+        "message": "=Hi {{ $('Code in JavaScript1').first().json.name }},\n\nYour site visit booking is successful.\nProperty: {{ $('Code in JavaScript1').first().json.property_name }}\nDate: {{ $('Code in JavaScript1').first().json.preferred_date }}\nTime: {{ $('Code in JavaScript1').first().json.preferred_time }}\nAssigned Agent: {{ $('Code in JavaScript1').first().json.assigned_agent }}\n\nA calendar invite has been sent to your email address.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "3f64fbd4-de11-4d88-ac13-acd4c85a94ab",
+      "name": "Send a message",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript1').first().json.agent_email }}",
+        "subject": "=Site Visit Booked: {{ $('Code in JavaScript1').first().json.name }}",
+        "emailType": "text",
+        "message": "=Site Visit Confirmed.\nLead Name: {{ $('Code in JavaScript1').first().json.name }}\nProperty: {{ $('Code in JavaScript1').first().json.property_name }}\nTime: {{ $('Code in JavaScript1').first().json.preferred_time }}\nDate: {{ $('Code in JavaScript1').first().json.preferred_date }}\n\nCalendar invite sent.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        0
+      ],
+      "id": "afae2a09-6cdb-401c-ae71-3aed9fd2740c",
+      "name": "Send a message1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Booking Confirmed</title>\n  <style>\n    body { font-family: 'Segoe UI', sans-serif; background-color: #F7F5F0; color: #1A1816; margin: 0; padding: 50px 20px; display: flex; justify-content: center; }\n    .box { background-color: rgba(255, 255, 255, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 0, 0, 0.08); padding: 40px; border-radius: 6px; max-width: 500px; width: 100%; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); text-align: center; box-sizing: border-box; }\n    h1 { font-size: 1.6rem; margin-top: 0; }\n    p { color: #666666; font-size: 0.95rem; }\n    .detail { background-color: #1A1816; border: 1px solid #2A2724; color: #FFFFFF; border-radius: 4px; padding: 18px; margin: 25px 0; font-size: 1rem; }\n    .detail strong { color: #C5A059; display: block; font-size: 1.1rem; margin-bottom: 4px; }\n  </style>\n</head>\n<body>\n  <div class=\"box\">\n    <h1>✅ Booking Confirmed!</h1>\n    <p>Your site visit has been scheduled. Check your email for the calendar invitation.</p>\n    <div class=\"detail\">\n      <strong>{{ $('Code in JavaScript1').first().json.property_name }}</strong>\n      {{ $('Code in JavaScript1').first().json.preferred_date }} at {{ $('Code in JavaScript1').first().json.preferred_time }}\n    </div>\n    <p>Need to change the slot? Contact your agent and they will help you.</p>\n  </div>\n</body>\n</html>\n",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2016,
+        0
+      ],
+      "id": "1bee253f-fdc0-448f-909e-0ff225600c10",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Booking Issue</title>\n  <style>\n    body { font-family: 'Segoe UI', sans-serif; background-color: #F7F5F0; color: #1A1816; margin: 0; padding: 50px 20px; display: flex; justify-content: center; }\n    .box { background-color: rgba(255, 255, 255, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 0, 0, 0.08); padding: 40px; border-radius: 6px; max-width: 500px; width: 100%; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); text-align: center; box-sizing: border-box; }\n    h1 { font-size: 1.5rem; color: #1A1816; }\n    p { color: #666666; font-size: 0.95rem; }\n  </style>\n</head>\n<body>\n  <div class=\"box\">\n    <h1>⚠️ We couldn't complete your booking</h1>\n    <p>This can happen if the link has expired, the chosen date or time is in the past, or there was a technical problem.</p>\n    <p>Please open the link from your email and try again, or contact your agent directly.</p>\n  </div>\n</body>\n</html>\n",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        288
+      ],
+      "id": "3424d9d0-90db-483b-8975-a031c8303afa",
+      "name": "Respond Booking Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e171a45f-59c8-4b61-92bd-31b931179aba",
+              "leftValue": "={{ (() => { const id = String(($json.body && $json.body.lead_id) || ($json.query && $json.query.lead_id) || ''); return /^L[0-9]+[A-Z0-9]*$/.test(id) && id.length < 30; })() }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        192
+      ],
+      "id": "72ce195b-7732-4f0f-a8d5-351aff3ab9ed",
+      "name": "Valid Lead Link?"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Invalid Booking Link</title>\n  <style>\n    body { font-family: 'Segoe UI', sans-serif; background-color: #F7F5F0; color: #1A1816; margin: 0; padding: 50px 20px; display: flex; justify-content: center; }\n    .box { background-color: rgba(255, 255, 255, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(0, 0, 0, 0.08); padding: 40px; border-radius: 6px; max-width: 500px; width: 100%; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); text-align: center; box-sizing: border-box; }\n    h1 { font-size: 1.5rem; color: #1A1816; }\n    p { color: #666666; font-size: 0.95rem; }\n  </style>\n</head>\n<body>\n  <div class=\"box\">\n    <h1>🔗 This booking link isn't valid</h1>\n    <p>The link is incomplete or has been changed.</p>\n    <p>Please use the exact link from your email, or contact your agent to get a new one.</p>\n  </div>\n</body>\n</html>\n",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        288
+      ],
+      "id": "b0687ea4-e899-421e-ad5c-09c1fe306694",
+      "name": "Respond Invalid Link"
+    },
+    {
+      "parameters": {
+        "content": "## Setup (read first)\n1. Paste your sheet ID into **YOUR_GOOGLE_SHEET_ID** (same sheet as workflow 1).\n2. Connect Google Sheets, Google Calendar and Gmail, and set the calendar in `Create an event`.\n3. Replace Project A/B/C with your projects in BOTH `Code in JavaScript1` and the dropdown in `Render Booking Form`.\n4. Times are fixed to IST (+05:30). Change it if you are in another timezone.",
+        "height": 260,
+        "width": 480
+      },
+      "id": "f71a83d0-6868-4296-bc8d-9930e659faa6",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -340
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Valid Lead Link?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Valid Lead Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is POST Submission?": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Render Booking Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Booking Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Booking Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Booking Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Lead Link?": {
+      "main": [
+        [
+          {
+            "node": "Is POST Submission?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}

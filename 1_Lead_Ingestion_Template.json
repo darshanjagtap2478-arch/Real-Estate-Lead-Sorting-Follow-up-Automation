@@ -1,0 +1,922 @@
+{
+  "name": "1. Lead Ingestion (Template)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-ingestion",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -896,
+        288
+      ],
+      "id": "c5566938-ce6d-430e-b409-ccfe0c8e77c2",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===================== SETTINGS - edit only these lines =====================\nconst BASE_URL = 'https://YOUR-N8N-DOMAIN';  // public URL of your n8n, no trailing slash\nconst AGENT_EMAIL = 'REPLACE_WITH_AGENT_EMAIL';               // receives the Hot/Warm alerts\nconst AGENT_NAME = 'Default Agent';                              // shown in the sheets and emails\n// ============================================================================\n\nlet lead = items[0].json;\nif (!lead.name && lead.body) { lead = lead.body; }\n\n// Remove < and > so nobody can put HTML into the emails, then trim spaces\nconst clean = (v) => (v === undefined || v === null ? '' : String(v)).replace(/[<>]/g, '').trim();\n\nconst name = clean(lead.name);\nconst email = clean(lead.email);\nconst phone = clean(lead.phone);\nconst location = clean(lead.location_pref);\nconst notes = clean(lead.notes);\nconst budgetMin = clean(lead.budget_min);\nconst budgetMax = clean(lead.budget_max);\n\nconst propertyTypes = ['Any', 'Apartment', 'Villa', 'Plot', 'Commercial'];\nconst propertyType = propertyTypes.includes(lead.property_type) ? lead.property_type : 'Any';\n\nconst sourceScores = { 'Website': 20, 'Landing Page': 20, 'Facebook': 10, 'Instagram': 10, 'Referral': 15, 'Google Ads': 15, 'Other': 5 };\nconst source = sourceScores[lead.source] ? lead.source : 'Other';\n\nconst phoneDigits = phone.replace(/\\D/g, '');\nconst emailOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n\n// ---------- scoring (same rules as before) ----------\nlet score = 0;\nif (budgetMin && budgetMax) score += 20;\nelse if (budgetMin || budgetMax) score += 10;\n\nif (location.length > 2) score += 20;\nif (phoneDigits.length >= 10) score += 15;\nif (emailOk) score += 10;\nif (propertyType !== 'Any') score += 15;\nscore += sourceScores[source];\n\nconst urgencyWords = ['urgent', 'asap', 'immediate', 'tomorrow', 'this week', 'ready', 'serious', 'buy now', 'fast', 'quick'];\nif (notes) {\n  const notesLower = notes.toLowerCase();\n  if (urgencyWords.some(w => notesLower.includes(w))) score += 20;\n}\n\nscore = Math.min(100, Math.max(0, score));\n\nlet status = 'Cold';\nif (score >= 80) status = 'Hot';\nelse if (score >= 50) status = 'Warm';\n\n// timestamp + random suffix so IDs can't be guessed\nconst randomPart = Math.random().toString(36).substring(2, 8).toUpperCase().padEnd(6, '0');\nconst leadId = 'L' + Date.now() + randomPart;\n\n// ---------- validation ----------\nconst validationErrors = [];\nif (!name) validationErrors.push('Name is required');\nif (!emailOk) validationErrors.push('A valid email is required');\nif (phoneDigits.length < 10) validationErrors.push('A valid 10-digit phone number is required');\nconst isValidLead = validationErrors.length === 0;\n\nreturn [{\n  json: {\n    \"Lead ID\": leadId,\n    \"Valid\": isValidLead,\n    \"Validation Errors\": validationErrors.join('; '),\n    \"Name\": name || \"N/A\",\n    \"Email\": email,\n    \"Phone\": phone,\n    \"Location\": location || \"N/A\",\n    \"Budget Min\": budgetMin,\n    \"Budget Max\": budgetMax,\n    \"Property Type\": propertyType,\n    \"Source\": source,\n    \"Notes\": notes,\n    \"Score\": score,\n    \"Status\": status,\n    \"Timestamp\": new Date().toISOString(),\n    // the agent is set here on the server, NOT taken from the public form (stops anyone sending alerts to any address)\n    \"Assigned Agent\": AGENT_NAME,\n    \"Agent Email\": AGENT_EMAIL,\n    \"Booking Link\": BASE_URL + '/webhook/book-visit?lead_id=' + leadId\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        288
+      ],
+      "id": "564e16ed-b5a9-44b1-9d87-b09e89aed341",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"message\": \"Lead successfully processed and scored.\" } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        192
+      ],
+      "id": "ae651bf9-70c7-4641-ad0d-0d413506e2e4",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Master Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{ $json['Lead ID'] }}",
+            "Name": "={{ $json.Name }}",
+            "Email": "={{ $json.Email }}",
+            "Phone": "={{ $json.Phone }}",
+            "Location": "={{ $json.Location }}",
+            "Budget Min": "={{ $json['Budget Min'] }}",
+            "Budget Max": "={{ $json['Budget Max'] }}",
+            "Property Type": "={{ $json['Property Type'] }}",
+            "Source": "={{ $json.Source }}",
+            "Notes": "={{ $json.Notes }}",
+            "Score": "={{ $json.Score }}",
+            "Status": "={{ $json.Status }}",
+            "Assigned Agent": "={{ $json['Assigned Agent'] }}",
+            "Agent Email": "={{ $json['Agent Email'] }}",
+            "Valid": "={{ $json.Valid }}",
+            "Validation Errors": "={{ $json['Validation Errors'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Budget Min",
+              "displayName": "Budget Min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Budget Max",
+              "displayName": "Budget Max",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Property Type",
+              "displayName": "Property Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Agent Email",
+              "displayName": "Agent Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Valid",
+              "displayName": "Valid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Validation Errors",
+              "displayName": "Validation Errors",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Assigned Agent",
+              "displayName": "Assigned Agent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -224,
+        192
+      ],
+      "id": "3876227c-cc60-4080-9056-f2c9db7e80a0",
+      "name": "Append row in sheet",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Scored Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{ $('Code in JavaScript').first().json['Lead ID'] }}",
+            "Name": "={{ $('Code in JavaScript').first().json['Name'] }}",
+            "Email": "={{ $('Code in JavaScript').first().json['Email'] }}",
+            "Phone": "={{ $('Code in JavaScript').first().json['Phone'] }}",
+            "Score": "={{ $('Code in JavaScript').first().json['Score'] }}",
+            "Timestamp": "={{ $('Code in JavaScript').first().json['Timestamp'] }}",
+            "Agent Email": "={{ $('Code in JavaScript').first().json['Agent Email'] }}",
+            "Response_Status": "Pending",
+            "Status": "={{ $('Code in JavaScript').first().json['Status'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Response_Status",
+              "displayName": "Response_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Agent Email",
+              "displayName": "Agent Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fallback_Reason",
+              "displayName": "Fallback_Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        192
+      ],
+      "id": "ea4b1164-16f0-4ecc-8446-145748e46506",
+      "name": "Append row in sheet1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Code in JavaScript').first().json['Score'] }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "id": "591c2b5e-9b58-478b-8694-b1a0936139dd"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        192
+      ],
+      "id": "0462b555-b3ec-4aee-8432-504184147ee4",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').first().json['Agent Email'] }}",
+        "subject": "=🚨 Hot Lead Alert: {{ $('Code in JavaScript').first().json['Name'] }} | Score: {{ $('Code in JavaScript').first().json['Score'] }}/100",
+        "emailType": "text",
+        "message": "=🚨 NEW HOT LEAD ALERT\nScore: {{ $('Code in JavaScript').first().json['Score'] }}/100 | Status: {{ $('Code in JavaScript').first().json['Status'] }}\n\nDETAILS:\nName: {{ $('Code in JavaScript').first().json['Name'] }}\nEmail: {{ $('Code in JavaScript').first().json['Email'] }}\nPhone: {{ $('Code in JavaScript').first().json['Phone'] }}\nLocation: {{ $('Code in JavaScript').first().json['Location'] }}\nBudget: ₹{{ $('Code in JavaScript').first().json['Budget Min'] }} - ₹{{ $('Code in JavaScript').first().json['Budget Max'] }}\nType: {{ $('Code in JavaScript').first().json['Property Type'] }}\nSource: {{ $('Code in JavaScript').first().json['Source'] }}\nNotes: {{ $('Code in JavaScript').first().json['Notes'] }}\nLead ID: {{ $('Code in JavaScript').first().json['Lead ID'] }}\n\nAction required: Follow up immediately.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "556dc5b3-0f23-4638-83a0-92420e3acad2",
+      "name": "Send a message",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').first().json['Email'] }}",
+        "subject": "=We found properties for you, {{ $('Code in JavaScript').first().json['Name'] }}!",
+        "message": "=Hi {{ $('Code in JavaScript').first().json['Name'] }},<br><br>Based on your criteria, we have premium properties ready for a site visit.<br><br>Click the link below to select your preferred booking slot:<br><br><a href=\"{{ $('Code in JavaScript').first().json['Booking Link'] }}\" style=\"background:#28a745;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block;\">Select Visit Date & Time</a><br><br>Best regards,<br>Real Estate Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "856ce247-6433-4e04-8e0e-5331f691775a",
+      "name": "Send a message1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').first().json['Email'] }}",
+        "subject": "=Thanks {{ $('Code in JavaScript').first().json['Name'] }}, we'll find the right property for you",
+        "emailType": "text",
+        "message": "=Hi {{ $('Code in JavaScript').first().json['Name'] }},\n\nWe have received your requirements. An agent will review options and contact you within 24 hours.\n\nBest regards,\nReal Estate Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        192
+      ],
+      "id": "b2ab4733-62f4-4a36-b76c-1bb863b4e653",
+      "name": "Send a message2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Code in JavaScript').first().json['Score'] }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        288
+      ],
+      "id": "86dbcecc-4c29-40ee-beab-2052eb398e78",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').first().json['Agent Email'] }}",
+        "subject": "=🟡 Warm Lead: {{ $('Code in JavaScript').first().json['Name'] }} | Score: {{ $('Code in JavaScript').first().json['Score'] }}/100",
+        "emailType": "text",
+        "message": "=🟡 WARM LEAD ALERT\nScore: {{ $('Code in JavaScript').first().json['Score'] }}/100\n\nName: {{ $('Code in JavaScript').first().json['Name'] }}\nPhone: {{ $('Code in JavaScript').first().json['Phone'] }}\n\nPlease call within 24 hours.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        192
+      ],
+      "id": "6f27834f-36a0-4a41-942f-18979f46c382",
+      "name": "Send a message3",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').first().json['Email'] }}",
+        "subject": "=Thanks for reaching out, {{ $('Code in JavaScript').first().json['Name'] }}!",
+        "emailType": "text",
+        "message": "=Hi {{ $('Code in JavaScript').first().json['Name'] }},\n\nWe have received your details. We will touch base shortly.\n\nBest regards,\nReal Estate Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        384
+      ],
+      "id": "25cd4ca1-4f54-4da1-8a90-49482f19f4f3",
+      "name": "Send a message4",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Audit Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $('Code in JavaScript').first().json['Timestamp'] }}",
+            "Event": "Cold Lead Logged",
+            "Lead ID": "={{ $('Code in JavaScript').first().json['Lead ID'] }}",
+            "Detail": "={{ $('Code in JavaScript').first().json['Name'] }} - Score: {{ $('Code in JavaScript').first().json['Score'] }}",
+            "Status": "={{ $('Code in JavaScript').first().json['Status'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Event",
+              "displayName": "Event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Detail",
+              "displayName": "Detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        384
+      ],
+      "id": "919b90f4-e758-4786-baa1-dd634c8171f7",
+      "name": "Append row in sheet2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json['Valid'] }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "a1b2c3d4-0001-0001-0001-000000000001"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -448,
+        288
+      ],
+      "id": "f62a3433-dee7-4e4c-8016-adaae10f657d",
+      "name": "Validate Lead"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"message\": \"Lead rejected - missing/invalid required fields.\", \"details\": $json['Validation Errors'] } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -224,
+        384
+      ],
+      "id": "66107187-612c-40f4-9ee5-04769e4bf621",
+      "name": "Respond Invalid Lead"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"message\": \"We could not save your enquiry right now. Please try again in a few minutes.\" } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "64ae7900-e794-4747-b32f-705d410354c6",
+      "name": "Respond Save Failed"
+    },
+    {
+      "parameters": {
+        "content": "## Setup (read first)\n1. Create the Google Sheet (tabs in README.md) and paste its ID into **YOUR_GOOGLE_SHEET_ID**.\n2. Connect your own Google Sheets and Gmail credentials.\n3. In `Code in JavaScript`, set **BASE_URL** (your public n8n URL), **AGENT_EMAIL** and **AGENT_NAME**.\n4. Send leads with POST to `/webhook/lead-ingestion` (fields in README.md).\nNever commit real keys, sheet IDs or emails.",
+        "height": 260,
+        "width": 480
+      },
+      "id": "65f73b28-2a14-42e5-9a06-055bf0e96297",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -340
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Validate Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Save Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Send a message3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message3": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message4": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}
